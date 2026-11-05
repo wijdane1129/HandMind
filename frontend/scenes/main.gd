@@ -3,9 +3,10 @@ extends Node3D
 @onready var anim: AnimationPlayer = $AnimationPlayer
 
 # ---------- Réglages ----------
-const MODE_DEMO := false        # true = l'avatar enchaîne les mouvements tout seul
+const MODE_DEMO := false      # true = l'avatar enchaîne les mouvements tout seul
+								# (remets false après le test de la tâche 1)
 const FONDU := 0.3              # durée du fondu entre animations (secondes)
-const INTERROMPRE := true      # true = une nouvelle commande coupe le mouvement en cours
+const INTERROMPRE := true       # true = une nouvelle commande coupe le mouvement en cours
 								# false = on finit le mouvement, puis on joue la commande en attente
 const REPOS := "repos"
 const MOUVEMENTS := ["main_gauche", "main_droite", "deux_bras", "accroupi"]
@@ -19,6 +20,10 @@ const TOUCHES := {
 
 # ---------- État ----------
 var label_mouvement: Label
+var label_predite: Label
+var label_vraie: Label
+var label_conf: Label
+var barre_conf: ProgressBar
 var en_attente := ""            # commande mémorisée quand INTERROMPRE = false
 
 
@@ -64,10 +69,48 @@ func _creer_interface() -> void:
 	layer.add_child(label_mouvement)
 	_maj_label(REPOS)
 
+	# Panneau "prédiction" (vide au départ, rempli plus tard par le WebSocket)
+	var panneau := VBoxContainer.new()
+	panneau.position = Vector2(20, 140)
+	layer.add_child(panneau)
+
+	label_predite = Label.new()
+	label_predite.text = "Prédite : —"
+	label_predite.add_theme_font_size_override("font_size", 24)
+	panneau.add_child(label_predite)
+
+	label_vraie = Label.new()
+	label_vraie.text = "Vraie : —"
+	label_vraie.add_theme_font_size_override("font_size", 24)
+	panneau.add_child(label_vraie)
+
+	label_conf = Label.new()
+	label_conf.text = "Confiance : —"
+	panneau.add_child(label_conf)
+
+	barre_conf = ProgressBar.new()
+	barre_conf.min_value = 0
+	barre_conf.max_value = 100
+	barre_conf.value = 0
+	barre_conf.show_percentage = false
+	barre_conf.custom_minimum_size = Vector2(300, 20)
+	panneau.add_child(barre_conf)
+
 
 func _maj_label(nom: String) -> void:
 	if label_mouvement:
 		label_mouvement.text = nom.replace("_", " ").capitalize()
+
+
+# Appelée par le WebSocket en S4. Vert si la prédiction est juste, rouge sinon.
+# conf est entre 0.0 et 1.0.
+func maj_prediction(predite: String, vraie: String, conf: float) -> void:
+	label_predite.text = "Prédite : " + predite.replace("_", " ")
+	label_vraie.text = "Vraie : " + vraie.replace("_", " ")
+	label_conf.text = "Confiance : %d %%" % int(conf * 100)
+	barre_conf.value = conf * 100
+	var couleur := Color.GREEN if predite == vraie else Color.RED
+	label_predite.add_theme_color_override("font_color", couleur)
 
 
 # ---------- Entrées clavier ----------
@@ -114,10 +157,17 @@ func _on_animation_finished(nom: StringName) -> void:
 		_maj_label(REPOS)
 
 
-# ---------- Mode démo ----------
+# ---------- Mode démo (test de l'interface) ----------
 func _demo() -> void:
+	# 4 mouvements avec prédiction juste -> texte vert
 	for nom in MOUVEMENTS:
 		await get_tree().create_timer(3.0).timeout
 		jouer(nom)
+		maj_prediction(nom, nom, 0.85)
+	# 1 prédiction fausse -> texte rouge
+	await get_tree().create_timer(3.0).timeout
+	jouer("main_gauche")
+	maj_prediction("main_gauche", "main_droite", 0.55)
+	# retour au repos
 	await get_tree().create_timer(3.0).timeout
 	jouer(REPOS)
