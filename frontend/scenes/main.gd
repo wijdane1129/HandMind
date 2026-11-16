@@ -1,13 +1,14 @@
 extends Node3D
 
 @onready var anim: AnimationPlayer = $AnimationPlayer
+@onready var label_etat: Label = $UI/LabelEtat
+@onready var label_info: Label = $UI/LabelInfo
 
 # ---------- Réglages ----------
-const MODE_DEMO := false      # true = l'avatar enchaîne les mouvements tout seul
-								# (remets false après le test de la tâche 1)
-const FONDU := 0.3              # durée du fondu entre animations (secondes)
-const INTERROMPRE := true       # true = une nouvelle commande coupe le mouvement en cours
-								# false = on finit le mouvement, puis on joue la commande en attente
+const MODE_DEMO := false          # true = l'avatar enchaîne les mouvements tout seul
+const INTERFACE_PAR_CODE := false # false = on utilise les Labels de la scène (UI/LabelEtat, UI/LabelInfo)
+const FONDU := 0.3                # durée du fondu entre animations (secondes)
+const INTERROMPRE := true         # true = une nouvelle commande coupe le mouvement en cours
 const REPOS := "repos"
 const MOUVEMENTS := ["main_gauche", "main_droite", "deux_bras", "accroupi"]
 
@@ -18,26 +19,54 @@ const TOUCHES := {
 	KEY_R: "deux_bras", KEY_T: "accroupi",
 }
 
+# Classe envoyée par le serveur -> nom de l'animation dans Godot
+const CORRESPONDANCE := {
+	"repos": "repos",
+	"main_gauche": "main_gauche",
+	"main_droite": "main_droite",
+	"deux_mains": "deux_bras",
+	"deux_pieds": "accroupi",
+}
+const NB_MESSAGES_T14 := 100
+
 # ---------- État ----------
 var label_mouvement: Label
 var label_predite: Label
 var label_vraie: Label
 var label_conf: Label
 var barre_conf: ProgressBar
-var en_attente := ""            # commande mémorisée quand INTERROMPRE = false
+var en_attente := ""
+
+var client: Node
+var recus := 0
+var animations_ok := 0
+var erreurs := 0
+var numeros_vus := []
+var log_t14 := []
+var log_ecrit := false
 
 
 func _ready() -> void:
 	_configurer_boucles()
 	anim.animation_finished.connect(_on_animation_finished)
-	_creer_interface()
+	if INTERFACE_PAR_CODE:
+		_creer_interface()
 	anim.play(REPOS)
+	label_etat.position = Vector2(20, 20)
+	label_info.position = Vector2(20, 70)
+	label_etat.add_theme_font_size_override("font_size", 24)
+	label_info.add_theme_font_size_override("font_size", 24)
+	label_etat.text = "Déconnecté"
+	label_etat.add_theme_color_override("font_color", Color.RED)
+	label_info.text = "En attente de messages..."
+	client = $WebSocketClient
+	client.classe_recue.connect(_on_classe_recue)
+	client.etat_change.connect(_on_etat_change)
 	if MODE_DEMO:
 		_demo()
 
 
-# Force les modes de boucle par code : repos boucle, les mouvements non.
-# (le signal animation_finished ne se déclenche jamais sur une animation en boucle)
+# Force les modes de boucle : repos boucle, les mouvements non.
 func _configurer_boucles() -> void:
 	for nom in [REPOS] + MOUVEMENTS:
 		if anim.has_animation(nom):
@@ -47,14 +76,13 @@ func _configurer_boucles() -> void:
 			push_warning("Animation manquante : " + nom)
 
 
-# ---------- Interface ----------
+# ---------- Interface créée par code (optionnelle) ----------
 func _creer_interface() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 
-	# Boutons en haut
 	var boite := HBoxContainer.new()
-	boite.position = Vector2(20, 20)
+	boite.position = Vector2(20, 200)
 	layer.add_child(boite)
 	for nom in [REPOS] + MOUVEMENTS:
 		var b := Button.new()
@@ -62,16 +90,14 @@ func _creer_interface() -> void:
 		b.pressed.connect(jouer.bind(nom))
 		boite.add_child(b)
 
-	# Nom du mouvement en grand
 	label_mouvement = Label.new()
-	label_mouvement.position = Vector2(20, 80)
+	label_mouvement.position = Vector2(20, 250)
 	label_mouvement.add_theme_font_size_override("font_size", 36)
 	layer.add_child(label_mouvement)
 	_maj_label(REPOS)
 
-	# Panneau "prédiction" (vide au départ, rempli plus tard par le WebSocket)
 	var panneau := VBoxContainer.new()
-	panneau.position = Vector2(20, 140)
+	panneau.position = Vector2(20, 310)
 	layer.add_child(panneau)
 
 	label_predite = Label.new()
@@ -102,14 +128,19 @@ func _maj_label(nom: String) -> void:
 		label_mouvement.text = nom.replace("_", " ").capitalize()
 
 
-# Appelée par le WebSocket en S4. Vert si la prédiction est juste, rouge sinon.
-# conf est entre 0.0 et 1.0.
+# Affiche prédiction, vraie classe et confiance (conf entre 0.0 et 1.0).
+# Vert si la prédiction est juste, rouge sinon.
 func maj_prediction(predite: String, vraie: String, conf: float) -> void:
+	var couleur := Color.GREEN if predite == vraie else Color.RED
+	if not INTERFACE_PAR_CODE:
+		label_info.text = "Prédite : %s\nVraie : %s\nConfiance : %d %%" % [
+			predite.replace("_", " "), vraie.replace("_", " "), int(conf * 100)]
+		label_info.add_theme_color_override("font_color", couleur)
+		return
 	label_predite.text = "Prédite : " + predite.replace("_", " ")
 	label_vraie.text = "Vraie : " + vraie.replace("_", " ")
 	label_conf.text = "Confiance : %d %%" % int(conf * 100)
 	barre_conf.value = conf * 100
-	var couleur := Color.GREEN if predite == vraie else Color.RED
 	label_predite.add_theme_color_override("font_color", couleur)
 
 
@@ -120,20 +151,18 @@ func _input(event: InputEvent) -> void:
 			jouer(TOUCHES[event.keycode])
 
 
-# ---------- Point d'entrée unique : clavier, boutons, et bientôt WebSocket ----------
+# ---------- Point d'entrée unique : clavier, boutons, WebSocket ----------
 func jouer(nom: String) -> void:
 	if not anim.has_animation(nom):
 		push_warning("Animation introuvable : " + nom)
 		return
 
 	# Même animation déjà en cours : on ne la relance pas
-	# (important plus tard : le classifieur renverra la même classe plusieurs fois de suite)
 	if anim.is_playing() and anim.current_animation == nom:
 		return
 
 	var occupe := anim.is_playing() and anim.current_animation != REPOS
 
-	# Mode "finir le mouvement" : on mémorise la commande pour plus tard
 	if occupe and not INTERROMPRE and nom != REPOS:
 		en_attente = nom
 		return
@@ -141,6 +170,81 @@ func jouer(nom: String) -> void:
 	en_attente = ""
 	anim.play(nom, FONDU)
 	_maj_label(nom)
+
+
+# ---------- WebSocket ----------
+func _on_etat_change(connecte: bool) -> void:
+	label_etat.text = "Connecté" if connecte else "Déconnecté"
+	label_etat.add_theme_color_override("font_color", Color.GREEN if connecte else Color.RED)
+	print("Connexion : ", connecte, " (reçus : ", recus, ")")
+	# Nouvelle connexion = nouveau test : on repart de zéro
+	if connecte:
+		_reinitialiser()
+		return
+	# Filet de sécurité : si la connexion se coupe, on écrit quand même le bilan
+	if not connecte and recus > 0 and not log_ecrit:
+		await get_tree().create_timer(0.5).timeout
+		if not log_ecrit:
+			_ecrire_log_t14()
+
+
+func _on_classe_recue(numero: int, classe: String, confiance: float, vraie_classe: String, _t: float) -> void:
+	recus += 1
+	numeros_vus.append(numero)
+	print("Reçu n°", numero, " classe=", classe)
+
+	var attendue: String = CORRESPONDANCE.get(classe, "")
+	var ok := false
+	if attendue != "":
+		jouer(attendue)
+		ok = (anim.current_animation == attendue)
+	maj_prediction(classe, vraie_classe, confiance)
+
+	if ok:
+		animations_ok += 1
+	else:
+		erreurs += 1
+	log_t14.append("n°%d classe=%s anim_attendue=%s anim_jouee=%s %s" % [
+		numero, classe, attendue, anim.current_animation, "OK" if ok else "ERREUR"])
+
+	if recus == NB_MESSAGES_T14 and not log_ecrit:
+		_ecrire_log_t14()
+
+
+func _reinitialiser() -> void:
+	recus = 0
+	animations_ok = 0
+	erreurs = 0
+	numeros_vus.clear()
+	log_t14.clear()
+	log_ecrit = false
+
+
+func _ecrire_log_t14() -> void:
+	log_ecrit = true
+	var doublons := recus - _compter_uniques()
+	# Le test n'est valide que si on a reçu exactement les numéros 0 à 99
+	var sequence_complete: bool = numeros_vus.size() > 0 and numeros_vus.min() == 0 and numeros_vus.max() == NB_MESSAGES_T14 - 1
+	var reussi: bool = recus == NB_MESSAGES_T14 and animations_ok == NB_MESSAGES_T14 and erreurs == 0 and doublons == 0 and sequence_complete
+	var resume := "T14 : %d reçus, %d animations correctes, %d erreurs, %d doublons -> %s" % [
+		recus, animations_ok, erreurs, doublons, "RÉUSSI" if reussi else "ÉCHEC"]
+	print(resume)
+	var f := FileAccess.open("user://resultats_T14.txt", FileAccess.WRITE)
+	if f == null:
+		push_warning("Impossible d'écrire le log T14")
+		return
+	f.store_line(resume)
+	for ligne in log_t14:
+		f.store_line(ligne)
+	f.close()
+	print("Log écrit dans : ", ProjectSettings.globalize_path("user://resultats_T14.txt"))
+
+
+func _compter_uniques() -> int:
+	var d := {}
+	for n in numeros_vus:
+		d[n] = true
+	return d.size()
 
 
 # ---------- Retour automatique au repos ----------
@@ -157,17 +261,14 @@ func _on_animation_finished(nom: StringName) -> void:
 		_maj_label(REPOS)
 
 
-# ---------- Mode démo (test de l'interface) ----------
+# ---------- Mode démo ----------
 func _demo() -> void:
-	# 4 mouvements avec prédiction juste -> texte vert
 	for nom in MOUVEMENTS:
 		await get_tree().create_timer(3.0).timeout
 		jouer(nom)
 		maj_prediction(nom, nom, 0.85)
-	# 1 prédiction fausse -> texte rouge
 	await get_tree().create_timer(3.0).timeout
 	jouer("main_gauche")
 	maj_prediction("main_gauche", "main_droite", 0.55)
-	# retour au repos
 	await get_tree().create_timer(3.0).timeout
 	jouer(REPOS)

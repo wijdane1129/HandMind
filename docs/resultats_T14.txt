@@ -1,0 +1,149 @@
+=====================================================
+HandMind - Résultats du test T14 (cohérence avatar)
+Semaine 4 - Étudiant B (Avatar & Interface)
+Date : 16/11/2026
+=====================================================
+
+OBJECTIF
+Vérifier que l'avatar réagit correctement aux messages reçus par WebSocket.
+Critère du cahier des charges : 100 messages connus envoyés ->
+100 % des animations correspondent à la classe reçue.
+
+PROCÉDURE
+- Serveur de test : python ws_server.py --cadence 2 --nombre 100
+  (100 messages numérotés de 0 à 99, 2 messages par seconde, soit environ 50 s)
+- Client : Godot 4.7.2 (WebSocketClient.gd + main.gd), lancé avant le serveur,
+  un seul client connecté
+- Séquence : les 5 classes en rotation (repos, main_gauche, main_droite,
+  deux_mains, deux_pieds)
+- Pour chaque message, Godot joue l'animation correspondante, puis vérifie
+  que l'animation en cours est bien celle attendue
+
+CORRESPONDANCE CLASSE -> ANIMATION
+repos        -> repos
+main_gauche  -> main_gauche
+main_droite  -> main_droite
+deux_mains   -> deux_bras
+deux_pieds   -> accroupi
+
+RÉSULTAT
+T14 : 100 reçus, 100 animations correctes, 0 erreurs, 0 doublons -> RÉUSSI
+Séquence reçue : numéros 0 à 99 complets, dans l'ordre
+
+LIMITES
+- Test en local (même machine), donc pas de latence réseau réelle
+- Confiance fixe à 0,87 et prédiction toujours égale à la vraie classe :
+  le cas "prédiction fausse" (texte rouge) n'est pas couvert par ce test
+- La latence (test T13) est mesurée séparément
+
+HISTORIQUE DES ESSAIS (corrections apportées)
+- Essai 1 : 69 messages reçus (n°30 à n°98). Invalide : un autre client était
+  encore connecté, donc Godot est arrivé après le message n°30 ; le dernier
+  message a aussi été perdu à la fermeture du serveur.
+- Corrections : pause de 1 s avant la fermeture du serveur, lecture des
+  derniers paquets même après la fermeture, compteurs remis à zéro à chaque
+  connexion, verdict exigeant la séquence 0 à 99 complète.
+- Essai final : RÉUSSI (résultat ci-dessus)
+
+DÉTAIL PAR MESSAGE (écrit automatiquement par Godot)
+T14 : 100 reçus, 100 animations correctes, 0 erreurs, 0 doublons -> RÉUSSI
+n°0 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°1 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°2 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°3 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°4 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°5 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°6 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°7 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°8 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°9 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°10 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°11 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°12 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°13 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°14 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°15 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°16 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°17 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°18 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°19 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°20 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°21 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°22 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°23 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°24 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°25 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°26 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°27 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°28 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°29 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°30 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°31 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°32 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°33 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°34 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°35 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°36 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°37 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°38 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°39 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°40 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°41 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°42 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°43 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°44 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°45 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°46 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°47 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°48 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°49 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°50 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°51 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°52 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°53 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°54 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°55 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°56 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°57 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°58 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°59 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°60 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°61 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°62 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°63 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°64 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°65 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°66 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°67 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°68 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°69 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°70 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°71 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°72 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°73 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°74 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°75 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°76 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°77 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°78 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°79 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°80 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°81 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°82 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°83 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°84 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°85 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°86 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°87 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°88 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°89 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°90 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°91 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°92 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°93 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°94 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
+n°95 classe=repos anim_attendue=repos anim_jouee=repos OK
+n°96 classe=main_gauche anim_attendue=main_gauche anim_jouee=main_gauche OK
+n°97 classe=main_droite anim_attendue=main_droite anim_jouee=main_droite OK
+n°98 classe=deux_mains anim_attendue=deux_bras anim_jouee=deux_bras OK
+n°99 classe=deux_pieds anim_attendue=accroupi anim_jouee=accroupi OK
