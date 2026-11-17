@@ -2,12 +2,12 @@ extends Node
 
 signal classe_recue(numero, classe, confiance, vraie_classe, t)
 signal etat_change(connecte)
+signal etat_flux(ok)
 
 const URL := "ws://localhost:8765"
 const DELAI_RECONNEXION := 2.0
 
 var socket := WebSocketPeer.new()
-var etat_precedent := WebSocketPeer.STATE_CLOSED
 var connecte_precedent := false
 var attente := 0.0
 var compteur_recus := 0
@@ -38,9 +38,15 @@ func _process(delta):
 	while socket.get_available_packet_count() > 0:
 		var texte = socket.get_packet().get_string_from_utf8()
 		var data = JSON.parse_string(texte)
-		if data == null:
+		if not (data is Dictionary):
 			print("JSON invalide : ", texte)
 			continue
+
+		# Message d'état du pont : {"type": "etat", "flux": true/false}
+		if data.get("type", "") == "etat":
+			etat_flux.emit(bool(data.get("flux", false)))
+			continue
+
 		compteur_recus += 1
 		classe_recue.emit(
 			int(data.get("numero", -1)),

@@ -28,6 +28,9 @@ const CORRESPONDANCE := {
 	"deux_pieds": "accroupi",
 }
 const NB_MESSAGES_T14 := 100
+const ACTIVER_T14 := false         # true uniquement pour rejouer T14 avec ws_server.py
+const NB_MESSAGES_T13 := 50        # nombre de messages mesurés pour la latence (T13)
+const SEUIL_LATENCE_MS := 500.0    # critère T13 : latence < 500 ms
 
 # ---------- État ----------
 var label_mouvement: Label
@@ -45,6 +48,12 @@ var numeros_vus := []
 var log_t14 := []
 var log_ecrit := false
 
+var label_flux: Label
+var label_latence: Label
+var latences: Array = []
+var lignes_t13: Array = []
+var t13_ecrit := false
+
 
 func _ready() -> void:
 	_configurer_boucles()
@@ -59,9 +68,11 @@ func _ready() -> void:
 	label_etat.text = "Déconnecté"
 	label_etat.add_theme_color_override("font_color", Color.RED)
 	label_info.text = "En attente de messages..."
+	_creer_labels_s5()
 	client = $WebSocketClient
 	client.classe_recue.connect(_on_classe_recue)
 	client.etat_change.connect(_on_etat_change)
+	client.etat_flux.connect(_on_etat_flux)
 	if MODE_DEMO:
 		_demo()
 
@@ -177,18 +188,20 @@ func _on_etat_change(connecte: bool) -> void:
 	label_etat.text = "Connecté" if connecte else "Déconnecté"
 	label_etat.add_theme_color_override("font_color", Color.GREEN if connecte else Color.RED)
 	print("Connexion : ", connecte, " (reçus : ", recus, ")")
+	if not connecte:
+		_maj_flux_label("inconnu", Color.GRAY)
 	# Nouvelle connexion = nouveau test : on repart de zéro
 	if connecte:
 		_reinitialiser()
 		return
 	# Filet de sécurité : si la connexion se coupe, on écrit quand même le bilan
-	if not connecte and recus > 0 and not log_ecrit:
+	if ACTIVER_T14 and not connecte and recus > 0 and not log_ecrit:
 		await get_tree().create_timer(0.5).timeout
 		if not log_ecrit:
 			_ecrire_log_t14()
 
 
-func _on_classe_recue(numero: int, classe: String, confiance: float, vraie_classe: String, _t: float) -> void:
+func _on_classe_recue(numero: int, classe: String, confiance: float, vraie_classe: String, t: float) -> void:
 	recus += 1
 	numeros_vus.append(numero)
 	print("Reçu n°", numero, " classe=", classe)
@@ -207,7 +220,9 @@ func _on_classe_recue(numero: int, classe: String, confiance: float, vraie_class
 	log_t14.append("n°%d classe=%s anim_attendue=%s anim_jouee=%s %s" % [
 		numero, classe, attendue, anim.current_animation, "OK" if ok else "ERREUR"])
 
-	if recus == NB_MESSAGES_T14 and not log_ecrit:
+	_mesurer_latence(numero, classe, vraie_classe, t)
+
+	if ACTIVER_T14 and recus == NB_MESSAGES_T14 and not log_ecrit:
 		_ecrire_log_t14()
 
 
@@ -218,6 +233,9 @@ func _reinitialiser() -> void:
 	numeros_vus.clear()
 	log_t14.clear()
 	log_ecrit = false
+	latences.clear()
+	lignes_t13.clear()
+	t13_ecrit = false
 
 
 func _ecrire_log_t14() -> void:
@@ -245,6 +263,68 @@ func _compter_uniques() -> int:
 	for n in numeros_vus:
 		d[n] = true
 	return d.size()
+
+
+# ---------- Semaine 5 : état du flux et latence (T13) ----------
+func _creer_labels_s5() -> void:
+	label_flux = Label.new()
+	label_flux.position = Vector2(20, 190)
+	label_flux.add_theme_font_size_override("font_size", 24)
+	$UI.add_child(label_flux)
+	_maj_flux_label("inconnu", Color.GRAY)
+
+	label_latence = Label.new()
+	label_latence.position = Vector2(20, 230)
+	label_latence.add_theme_font_size_override("font_size", 24)
+	label_latence.text = "Latence : —"
+	$UI.add_child(label_latence)
+
+
+func _maj_flux_label(etat: String, couleur: Color) -> void:
+	label_flux.text = "Flux EEG : " + etat
+	label_flux.add_theme_color_override("font_color", couleur)
+
+
+func _on_etat_flux(ok: bool) -> void:
+	if ok:
+		_maj_flux_label("reçu", Color.GREEN)
+	else:
+		_maj_flux_label("perdu", Color.RED)
+
+
+func _mesurer_latence(numero: int, classe: String, vraie_classe: String, t: float) -> void:
+	# t doit être une heure Unix (secondes). Sinon (temps relatif) on ne mesure pas.
+	if t < 1.0e9:
+		return
+	var latence_ms: float = (Time.get_unix_time_from_system() - t) * 1000.0
+	latences.append(latence_ms)
+	lignes_t13.append("n°%d prédite=%s vraie=%s latence=%.1f ms" % [numero, classe, vraie_classe, latence_ms])
+	label_latence.text = "Latence : %.0f ms (n=%d)" % [latence_ms, latences.size()]
+	if latences.size() >= NB_MESSAGES_T13 and not t13_ecrit:
+		_ecrire_log_t13()
+
+
+func _ecrire_log_t13() -> void:
+	t13_ecrit = true
+	var tri: Array = latences.duplicate()
+	tri.sort()
+	var n: int = tri.size()
+	var mediane: float = tri[int(n / 2.0)]
+	var p95: float = tri[int(ceil(0.95 * n)) - 1]
+	var maxi: float = tri[n - 1]
+	var reussi: bool = p95 < SEUIL_LATENCE_MS
+	var resume := "T13 : %d messages, latence médiane %.1f ms, 95e centile %.1f ms, max %.1f ms -> %s" % [
+		n, mediane, p95, maxi, "RÉUSSI" if reussi else "ÉCHEC"]
+	print(resume)
+	var f := FileAccess.open("user://resultats_T13.txt", FileAccess.WRITE)
+	if f == null:
+		push_warning("Impossible d'écrire le log T13")
+		return
+	f.store_line(resume)
+	for ligne in lignes_t13:
+		f.store_line(ligne)
+	f.close()
+	print("Log écrit dans : ", ProjectSettings.globalize_path("user://resultats_T13.txt"))
 
 
 # ---------- Retour automatique au repos ----------
