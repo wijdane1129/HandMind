@@ -31,7 +31,7 @@ def test_T1_physionet_subject():
               for name, code in event_id.items()}
     # 6 imagery runs x 15 cues = 45 hand cues + 45 feet/both-hands cues
     assert counts["main_gauche"] + counts["main_droite"] == 45
-    assert counts["deux_mains"] + counts["pieds"] == 45
+    assert counts["deux_mains"] + counts["deux_pieds"] == 45
     assert counts["repos"] >= 85  # ~15 rest periods per run
 
 

@@ -1,12 +1,16 @@
-﻿# Python
+# Python
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
 *.joblib
+# S6: the online model is small (a few kB) and B needs it to run the real bridge
+!models/online_*.joblib
 
 # Données (trop lourdes pour Git)
 data/*
 !data/.gitkeep
+# S6: train/demo split must be shared (both students use the same demo subjects)
+!data/splits.json
 
 # Godot
 .godot/

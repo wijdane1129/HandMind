@@ -35,12 +35,16 @@ ALL_RUNS = sorted(RUNS_HANDS + RUNS_FEET)
 EXCLUDED_SUBJECTS = [88, 92, 100, 104]
 
 # Class names = the 5 avatar movements (section 2 of the cahier des charges)
-CLASSES = ["repos", "main_gauche", "main_droite", "deux_mains", "pieds"]
-EVENT_ID = {name: i for i, name in enumerate(CLASSES)}  # repos=0 ... pieds=4
+# S6: "pieds" renamed "deux_pieds" to match the JSON contract of Etudiant B
+# (docs/protocole_json.md). Codes are unchanged (deux_pieds = 4), so the
+# epochs and models saved before S6 still work.
+CLASSES = ["repos", "main_gauche", "main_droite", "deux_mains", "deux_pieds"]
+EVENT_ID = {name: i for i, name in enumerate(CLASSES)}  # repos=0 ... deux_pieds=4
+CLASS_ALIASES = {"pieds": "deux_pieds"}  # old name -> contract name
 
 # PhysioNet code -> our class name, depending on the run type
 ANNOTATION_MAP_HANDS = {"T0": "repos", "T1": "main_gauche", "T2": "main_droite"} #run 4/8/12
-ANNOTATION_MAP_FEET = {"T0": "repos", "T1": "deux_mains", "T2": "pieds"} #run 6/10/14
+ANNOTATION_MAP_FEET = {"T0": "repos", "T1": "deux_mains", "T2": "deux_pieds"} #run 6/10/14
 
 # ---------------------------------------------------------------------------
 # Electrode configurations (section 4)
@@ -111,8 +115,11 @@ FBCSP_K_BEST = 10        # features kept by mutual information
 
 # Filled at the end of S4 (see docs/S4_RESULTS.md), read by the online
 # classifier in S5.
-CHOSEN_MODEL = None      # e.g. "riemann"
-CHOSEN_CONFIG = None     # e.g. "B"
+# S4 choice: Riemann is the best model in every table (S3 2 classes, S4 3
+# classes, LOSO, BCI IV 2a). Config B (17 ch) instead of A (64 ch): ~5
+# points lower but 4x fewer channels, faster online, and the cahier's focus.
+CHOSEN_MODEL = "riemann"
+CHOSEN_CONFIG = "B"
 
 # BCI Competition IV 2a benchmark (test T8)
 BCI2A_SUBJECTS = list(range(1, 10))
@@ -144,9 +151,30 @@ ONLINE_FILTER_ORDER = 4  # Butterworth band-pass 8-30 Hz + notch 60 Hz
 LSL_EEG_TYPE = "EEG"
 LSL_MARKER_TYPE = "Markers"
 
-# WebSocket contract with the Godot front (see the front install sheet)
-WS_HOST = "127.0.0.1"
+# Stream names of the player (backend/reader/lecteur.py)
+LSL_EEG_NAME = "HandMind_EEG"
+LSL_MARKER_NAME = "HandMind_Markers"
+# Unit of the EEG stream: the player sends microvolts by default (desc/unit),
+# the models are trained in volts (MNE). Factor applied to the stream:
+LSL_UNIT_SCALE = {"volts": 1.0, "v": 1.0, "microvolts": 1e-6, "uv": 1e-6,
+                  "µv": 1e-6, "millivolts": 1e-3, "mv": 1e-3}
+# Technical markers of the player: start of a new run (signal jump) and end
+LSL_NEW_RUN_PREFIX = "NOUVEAU_RUN"
+LSL_END_PREFIX = "FIN"
+
+# WebSocket contract with the Godot front (docs/protocole_json.md, v1.2)
+WS_HOST = "localhost"
 WS_PORT = 8765
+WS_STATE_PERIOD_S = 0.5    # {"type": "etat"} message every 0.5 s
+WS_STREAM_LOST_S = 1.5     # no EEG sample for 1.5 s -> "flux perdu"
+
+# ---------------------------------------------------------------------------
+# S6 - Integration, T12 / T15
+# ---------------------------------------------------------------------------
+T12_MEDIAN_MS = 200.0      # window received -> decision, median
+T12_P95_MS = 300.0         # 95th percentile
+T15_MAX_GAP = 0.05         # online vs offline accuracy: gap <= 5 points
+N_T15_SUBJECTS = 3         # S6: 3 demo subjects (S9: all 10)
 
 
 def online_model_name():

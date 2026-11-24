@@ -65,7 +65,9 @@ class Run:
         self.source = make_source(args)
         self.clf = OnlineClassifier(self.bundle, self.source.ch_names,
                                     self.source.sfreq,
-                                    threshold=args.threshold, n_vote=args.vote)
+                                    threshold=args.threshold, n_vote=args.vote,
+                                    scale=getattr(self.source, "scale", 1.0),
+                                    to_t=getattr(self.source, "to_unix", None))
         self.args = args
         self.messages = []
         self.clients = set()
@@ -110,6 +112,9 @@ class Run:
                 if self.clients:
                     await self.broadcast(msg)
             await asyncio.sleep(0)   # let the websocket server breathe
+            if self.clf.ended:
+                print("[LSL] end of replay (FIN marker)")
+                break
             if self.args.duration and self.clf.last_ts is not None and \
                     self.clf.last_ts - self.clf.t0 >= self.args.duration:
                 break
@@ -130,15 +135,21 @@ class Run:
             print("No decision made.")
             return
         m = self.messages
-        ok = np.mean([x["classe"] == x["vraie_classe"] for x in m])
-        print(f"\n{len(m)} decisions over {m[-1]['t']:.1f} s "
-              f"({len(m) / max(m[-1]['t'], 1e-9):.2f} per s)")
+        known = [x for x in m if x["vraie_classe"]] or m
+        ok = np.mean([x["classe"] == x["vraie_classe"] for x in known])
+        dur = (self.clf.last_ts - self.clf.t0) if self.clf.t0 is not None else 0
+        print(f"\n{len(m)} decisions over {dur:.1f} s "
+              f"({len(m) / max(dur, 1e-9):.2f} per s)")
         print(f"Decision = true class: {ok:.1%} of decisions")
         print("Decisions per class:", dict(Counter(x["classe"] for x in m)))
         p = np.array(self.clf.proc_ms)
         gd = group_delay_ms(self.clf.sfreq)
         print(f"Processing time per decision: mean {p.mean():.1f} ms, "
               f"max {p.max():.1f} ms (budget: {config.ONLINE_STEP_S * 1000:.0f} ms)")
+        lat = np.array(self.clf.latency_ms)
+        print(f"T12 chunk -> decision: median {np.median(lat):.1f} ms, "
+              f"p95 {np.percentile(lat, 95):.1f} ms (limits "
+              f"{config.T12_MEDIAN_MS:.0f} / {config.T12_P95_MS:.0f} ms)")
         print("Causal filter delay: "
               + ", ".join(f"{d:.0f} ms at {f:.0f} Hz" for f, d in gd.items()))
 

@@ -101,8 +101,8 @@ def test_threshold_low_confidence_is_rest():
 def test_vote_needs_2_of_3():
     d = DecisionMaker(CLASSES5, threshold=0.4, n_vote=3)
     assert d.update(_p("main_droite"))[0] == "main_droite"   # 1/1
-    assert d.update(_p("pieds"))[0] == "main_droite"         # 1-1: keep
-    assert d.update(_p("pieds"))[0] == "pieds"               # 2/3
+    assert d.update(_p("deux_pieds"))[0] == "main_droite"         # 1-1: keep
+    assert d.update(_p("deux_pieds"))[0] == "deux_pieds"               # 2/3
 
 
 def test_single_noisy_window_is_ignored():
@@ -115,11 +115,11 @@ def test_single_noisy_window_is_ignored():
 
 def test_no_majority_keeps_previous():
     d = DecisionMaker(CLASSES5, threshold=0.4, n_vote=3)
-    d.update(_p("pieds"))
-    d.update(_p("pieds"))                  # decision: pieds
+    d.update(_p("deux_pieds"))
+    d.update(_p("deux_pieds"))                  # decision: pieds
     d.update(_p("main_gauche"))            # p / p / g  -> still pieds
     d.update(_p("main_droite"))            # p / g / d  -> no majority
-    assert d.decision == "pieds"
+    assert d.decision == "deux_pieds"
 
 
 def test_confidence_range_and_two_class_rest():
@@ -131,7 +131,7 @@ def test_confidence_range_and_two_class_rest():
 
 
 def test_marker_to_class():
-    assert marker_to_class("pieds") == "pieds"
+    assert marker_to_class("deux_pieds") == "deux_pieds"
     assert marker_to_class(["main_gauche"]) == "main_gauche"
     assert marker_to_class("2") == "main_droite"
     assert marker_to_class("T1") is None
@@ -216,7 +216,7 @@ def test_message_matches_front_contract(bundle):
     data, markers = _synthetic_recording(seconds=10)
     msgs, _ = _run(bundle, data, markers)
     for m in msgs:
-        assert set(m) == {"classe", "confiance", "vraie_classe", "t"}
+        assert set(m) == {"numero", "classe", "confiance", "vraie_classe", "t"}
         assert m["classe"] in config.CLASSES
         assert m["vraie_classe"] in config.CLASSES
         assert 0.0 <= m["confiance"] <= 1.0

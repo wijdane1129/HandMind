@@ -14,7 +14,7 @@ from handmind import config  # noqa: E402
 # Known sequence of cues in the fake recording: (onset_s, class_name)
 FAKE_CUES = [
     (2.0, "repos"), (8.0, "main_gauche"), (14.0, "repos"),
-    (20.0, "main_droite"), (26.0, "deux_mains"), (32.0, "pieds"),
+    (20.0, "main_droite"), (26.0, "deux_mains"), (32.0, "deux_pieds"),
     (38.0, "main_gauche"),
 ]
 

@@ -26,6 +26,11 @@ def _annotation_map(run):
     raise ValueError(f"Run {run} is not an imagery run used by HandMind")
 
 
+# MNE >= 1.12 renamed "standard_1005" to "colin27_1005" (FutureWarning)
+_MONTAGE = ("colin27_1005" if "colin27_1005" in mne.channels.get_builtin_montages()
+            else "standard_1005")
+
+
 def load_physionet_raw(subject, runs=config.ALL_RUNS, path=config.RAW_DIR):
     """Load one subject as a single continuous Raw with explicit class annotations.
 
@@ -34,7 +39,7 @@ def load_physionet_raw(subject, runs=config.ALL_RUNS, path=config.RAW_DIR):
     raw : mne.io.Raw
         64 EEG channels, 160 Hz, standard 10-10 names (C3, Cz, ...),
         annotations renamed to "repos", "main_gauche", "main_droite",
-        "deux_mains", "pieds".
+        "deux_mains", "deux_pieds".
     """
     files = download_physionet(subject, runs, path)
     raws = []
@@ -45,7 +50,7 @@ def load_physionet_raw(subject, runs=config.ALL_RUNS, path=config.RAW_DIR):
 
     raw = mne.concatenate_raws(raws)
     eegbci.standardize(raw)                 # normaliser les noms des électrodes selon les conventions EEGBCI
-    raw.set_montage("standard_1005")        # 3D positions, needed for topographic so MNE knows where C3, Cz and C4 are located.
+    raw.set_montage(_MONTAGE)        # 3D positions, needed for topographic so MNE knows where C3, Cz and C4 are located.
     return raw
 
 

@@ -68,26 +68,62 @@ class ReplaySource:
 
 
 class LSLSource:
-    """Read the EEG + marker LSL streams of the dataset player."""
+    """Read the EEG + marker LSL streams of the dataset player.
 
-    def __init__(self, eeg_type=config.LSL_EEG_TYPE,
+    S6: streams are found by NAME first (HandMind_EEG / HandMind_Markers,
+    see backend/reader/lecteur.py), then by type. The unit written by the
+    player in desc/unit gives `.scale` (microvolts -> 1e-6, to get volts).
+    `.to_unix(ts)` converts an LSL timestamp to Unix time (same machine).
+    """
+
+    def __init__(self, eeg_name=config.LSL_EEG_NAME,
+                 marker_name=config.LSL_MARKER_NAME,
+                 eeg_type=config.LSL_EEG_TYPE,
                  marker_type=config.LSL_MARKER_TYPE, timeout=10.0):
         import pylsl  # only needed for the real chain
+        self._pylsl = pylsl
 
-        eeg = pylsl.resolve_byprop("type", eeg_type, timeout=timeout)
+        eeg = self._resolve(eeg_name, eeg_type, timeout)
         if not eeg:
             raise RuntimeError(
-                f"No LSL stream of type {eeg_type!r} found. Is the dataset "
-                "player running? (or use --replay SUBJECT)")
+                f"No LSL stream {eeg_name!r} (type {eeg_type!r}) found. Is the "
+                "dataset player running? (or use --replay SUBJECT)")
         self.inlet = pylsl.StreamInlet(eeg[0], max_buflen=10)
         info = self.inlet.info()
         self.sfreq = info.nominal_srate()
         self.ch_names = self._channel_names(info)
+        self.unit = info.desc().child_value("unit") or "volts"
+        self.scale = self.unit_scale(self.unit)
+        print(f"[LSL] EEG: {info.name()}, {info.channel_count()} ch, "
+              f"{self.sfreq:g} Hz, unit {self.unit!r} (x{self.scale:g} -> V)")
 
-        markers = pylsl.resolve_byprop("type", marker_type, timeout=2.0)
+        markers = self._resolve(marker_name, marker_type, 2.0)
         self.markers = pylsl.StreamInlet(markers[0]) if markers else None
         if self.markers is None:
-            print(f"[LSL] no {marker_type!r} stream: vraie_classe will be 'repos'")
+            print(f"[LSL] no marker stream: vraie_classe will be empty")
+        self._sync_clock()
+
+    def _resolve(self, name, stype, timeout):
+        found = self._pylsl.resolve_byprop("name", name, 1, timeout)
+        return found or self._pylsl.resolve_byprop("type", stype, 1, 1.0)
+
+    def _sync_clock(self):
+        """LSL clock -> Unix clock (+ correction if the player runs elsewhere)."""
+        try:
+            corr = self.inlet.time_correction(1.0)
+        except Exception:
+            corr = 0.0
+        self.lsl_to_unix = time.time() - self._pylsl.local_clock() + corr
+
+    def to_unix(self, ts):
+        return round(float(ts + self.lsl_to_unix), 4)
+
+    @staticmethod
+    def unit_scale(unit):
+        key = str(unit).strip().lower()
+        if key not in config.LSL_UNIT_SCALE:
+            raise RuntimeError(f"Unknown EEG unit {unit!r} in the stream")
+        return config.LSL_UNIT_SCALE[key]
 
     @staticmethod
     def _channel_names(info):
@@ -104,14 +140,19 @@ class LSLSource:
         raise RuntimeError("The EEG stream has no channel labels: ask the "
                            "player to send them (desc/channels/channel/label)")
 
+    def pull(self, timeout=0.0):
+        """One non-blocking read: (samples, timestamps, markers)."""
+        samples, ts = self.inlet.pull_chunk(timeout=timeout, max_samples=1024)
+        new = []
+        if self.markers is not None:
+            m, mts = self.markers.pull_chunk(timeout=0.0)
+            new = list(zip(mts, (x[0] for x in m)))
+        if samples:
+            return np.asarray(samples), np.asarray(ts), new
+        return np.empty((0, len(self.ch_names))), np.empty(0), new
+
     def __iter__(self):
         while True:
-            samples, ts = self.inlet.pull_chunk(timeout=0.05)
-            new = []
-            if self.markers is not None:
-                m, mts = self.markers.pull_chunk(timeout=0.0)
-                new = list(zip(mts, (x[0] for x in m)))
-            if samples:
-                yield np.asarray(samples), np.asarray(ts), new
-            elif new:
-                yield np.empty((0, len(self.ch_names))), np.empty(0), new
+            samples, ts, new = self.pull(timeout=0.05)
+            if len(ts) or new:
+                yield samples, ts, new
