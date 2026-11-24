@@ -1,0 +1,158 @@
+"""Central configuration for HandMind.
+
+Every constant used by more than one file lives here, so that changing a
+parameter (filter band, epoch window, channel list...) is done in one place.
+"""
+
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Paths  (backend/handmind/config.py -> project root is 2 levels up)
+# ---------------------------------------------------------------------------
+ROOT_DIR = Path(__file__).resolve().parents[2]
+DATA_DIR = ROOT_DIR / "data"
+RAW_DIR = DATA_DIR / "raw"            # downloaded EDF files (gitignored)
+PROCESSED_DIR = DATA_DIR / "processed"  # preprocessed epochs (.npz, gitignored)
+SPLITS_FILE = DATA_DIR / "splits.json"  # train / demo subjects (committed)
+FIGURES_DIR = ROOT_DIR / "docs" / "figures"
+RESULTS_DIR = ROOT_DIR / "docs" / "results"  # CSV / Markdown result tables
+MODELS_DIR = ROOT_DIR / "models"
+
+# ---------------------------------------------------------------------------
+# PhysioNet EEG Motor Movement/Imagery (EEGMMIDB)
+# ---------------------------------------------------------------------------
+N_SUBJECTS = 109
+SFREQ = 160.0 #Sampling frequency
+
+# Imagery runs only (we never use the real-movement runs 3, 5, 7, 9, 11, 13)
+RUNS_HANDS = [4, 8, 12]   # T1 = left hand,  T2 = right hand
+RUNS_FEET = [6, 10, 14]   # T1 = both hands, T2 = both feet
+ALL_RUNS = sorted(RUNS_HANDS + RUNS_FEET)
+
+# Subjects with a known recording problem (wrong sampling rate or
+# incomplete runs). Excluded from training AND from the demo draw.
+# -> confirm during the S1 exploration and note it in the report.
+EXCLUDED_SUBJECTS = [88, 92, 100, 104]
+
+# Class names = the 5 avatar movements (section 2 of the cahier des charges)
+CLASSES = ["repos", "main_gauche", "main_droite", "deux_mains", "pieds"]
+EVENT_ID = {name: i for i, name in enumerate(CLASSES)}  # repos=0 ... pieds=4
+
+# PhysioNet code -> our class name, depending on the run type
+ANNOTATION_MAP_HANDS = {"T0": "repos", "T1": "main_gauche", "T2": "main_droite"} #run 4/8/12
+ANNOTATION_MAP_FEET = {"T0": "repos", "T1": "deux_mains", "T2": "pieds"} #run 6/10/14
+
+# ---------------------------------------------------------------------------
+# Electrode configurations (section 4)
+# Names are those produced by mne.datasets.eegbci.standardize()
+# ---------------------------------------------------------------------------
+CHANNELS_ALL = [
+    "FC5", "FC3", "FC1", "FCz", "FC2", "FC4", "FC6",
+    "C5", "C3", "C1", "Cz", "C2", "C4", "C6",
+    "CP5", "CP3", "CP1", "CPz", "CP2", "CP4", "CP6",
+    "Fp1", "Fpz", "Fp2",
+    "AF7", "AF3", "AFz", "AF4", "AF8",
+    "F7", "F5", "F3", "F1", "Fz", "F2", "F4", "F6", "F8",
+    "FT7", "FT8", "T7", "T8", "T9", "T10", "TP7", "TP8",
+    "P7", "P5", "P3", "P1", "Pz", "P2", "P4", "P6", "P8",
+    "PO7", "PO3", "POz", "PO4", "PO8",
+    "O1", "Oz", "O2", "Iz",
+]
+
+CHANNEL_CONFIGS = {
+    "A": CHANNELS_ALL,  # 64 channels - reference
+    "B": [               # 17 channels - motor cortex
+        "FC3", "FC1", "FCz", "FC2", "FC4",
+        "C5", "C3", "C1", "Cz", "C2", "C4", "C6",
+        "CP3", "CP1", "CPz", "CP2", "CP4",
+    ],
+    "C": ["C3", "Cz", "C4"],  # 3 channels - cheap headset
+}
+
+# ---------------------------------------------------------------------------
+# Preprocessing (section 4)
+# ---------------------------------------------------------------------------
+L_FREQ = 8.0     # band-pass low edge (Hz)
+H_FREQ = 30.0    # band-pass high edge (Hz)
+NOTCH_FREQ = 60.0  # US mains (PhysioNet recorded in the USA)
+TMIN = 0.5       # epoch start after cue (s)
+TMAX = 4.0       # epoch end after cue (s)
+
+# ---------------------------------------------------------------------------
+# Demo subjects (section 4): drawn once in S1, never used for training
+# ---------------------------------------------------------------------------
+N_DEMO_SUBJECTS = 10
+RANDOM_SEED = 42
+
+# ---------------------------------------------------------------------------
+# S3 - Offline baselines (2 classes, intra-subject)
+# ---------------------------------------------------------------------------
+BASELINE_CLASSES = ["main_gauche", "main_droite"]  # left vs right hand
+N_BASELINE_SUBJECTS = 20   # first 20 TRAIN subjects of splits.json
+N_FOLDS = 5                # stratified k-fold, shuffled with RANDOM_SEED
+CSP_N_COMPONENTS = 6       # clipped to n_channels for config C (3 channels)
+
+# ---------------------------------------------------------------------------
+# S4 - 3 / 5 classes, FBCSP, model choice
+# ---------------------------------------------------------------------------
+CLASS_SETS = {
+    2: ["main_gauche", "main_droite"],
+    3: ["repos", "main_gauche", "main_droite"],
+    5: CLASSES,
+}
+# "repos" has ~2x more trials than each movement: with 3 or 5 classes the
+# classes are balanced (random under-sampling, RANDOM_SEED) before the CV.
+
+# FBCSP filter bank. The saved epochs are already band-passed 8-30 Hz, so the
+# bands stay inside 8-30 Hz (no need to rebuild data/processed/).
+FBCSP_BANDS = [(8, 12), (12, 16), (16, 20), (20, 24), (24, 30)]
+FBCSP_N_COMPONENTS = 4   # CSP filters per band (clipped to n_channels)
+FBCSP_K_BEST = 10        # features kept by mutual information
+
+# Filled at the end of S4 (see docs/S4_RESULTS.md), read by the online
+# classifier in S5.
+CHOSEN_MODEL = None      # e.g. "riemann"
+CHOSEN_CONFIG = None     # e.g. "B"
+
+# BCI Competition IV 2a benchmark (test T8)
+BCI2A_SUBJECTS = list(range(1, 10))
+BCI2A_EVENT_ID = {"left_hand": 1, "right_hand": 2, "feet": 3, "tongue": 4}
+# In MOABB, each BCI IV 2a event marks the START of the trial (fixation
+# cross); the cue appears 2 s later (MOABB: interval=[2, 6]). Windows are
+# therefore given relative to the CUE and shifted by this offset.
+BCI2A_CUE_OFFSET = 2.0   # s from the event to the cue
+BCI2A_TMIN = 0.5         # s after the cue (standard window 0.5-2.5 s)
+BCI2A_TMAX = 2.5
+BCI2A_NOTCH = 50.0       # recorded in Austria (50 Hz mains)
+
+# ---------------------------------------------------------------------------
+# S5 - Online (real-time) classifier
+# ---------------------------------------------------------------------------
+ONLINE_WINDOW_S = 1.0    # sliding window length (s)
+ONLINE_STEP_S = 0.25     # one decision every 250 ms (4 per second)
+ONLINE_CLASSES = 5       # number of classes of the online model (2, 3 or 5)
+ONLINE_THRESHOLD = 0.40  # below this probability the window counts as "repos"
+                         # (chance = 0.20 with 5 classes) - tune in S6
+ONLINE_N_VOTE = 3        # majority vote over the last 3 windows
+# Training windows cut inside each trial, relative to the cue (s):
+# 0.5-1.5, 1.0-2.0, ... 3.0-4.0  ->  6 windows per trial
+ONLINE_TRAIN_STARTS = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+# Causal filter (the zero-phase filter of S2 needs future samples)
+ONLINE_FILTER_ORDER = 4  # Butterworth band-pass 8-30 Hz + notch 60 Hz
+
+# LSL streams sent by the dataset player (Etudiant B, S3) - resolved by type
+LSL_EEG_TYPE = "EEG"
+LSL_MARKER_TYPE = "Markers"
+
+# WebSocket contract with the Godot front (see the front install sheet)
+WS_HOST = "127.0.0.1"
+WS_PORT = 8765
+
+
+def online_model_name():
+    """Model used online: the S4 choice, or Riemann until it is filled."""
+    return CHOSEN_MODEL or "riemann"
+
+
+def online_config_name():
+    return CHOSEN_CONFIG or "B"

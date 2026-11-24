@@ -1,0 +1,13 @@
+mne>=1.6
+moabb>=1.1
+pyriemann
+scikit-learn
+numpy
+pandas
+joblib
+scipy
+matplotlib
+jupyter
+pylsl
+websockets
+pytest
