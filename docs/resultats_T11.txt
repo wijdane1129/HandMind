@@ -1,0 +1,64 @@
+HandMind - Resultats du test T11 (lecteur de dataset)
+=====================================================
+Date            : 16/11/2026
+Responsable     : Etudiant B (Avatar & Interface)
+Fichiers testes : backend/reader/lecteur.py, backend/reader/recepteur_t11.py
+Environnement   : Windows, Python 3.10 (env conda "handmind"), pylsl 1.18.0 (liblsl v1.18.0.b6)
+
+Critere T11 : diffuser 10 min de donnees, comparer les horodatages.
+              Derive < 1 %, aucun echantillon perdu.
+
+---------------------------------------------------------------------
+1. Test principal : 10 min a vitesse x1
+---------------------------------------------------------------------
+Commandes :
+  terminal 1 : python lecteur.py --sujet 1 --runs 4 8 12 --boucle --duree 620 --attendre
+  terminal 2 : python recepteur_t11.py --duree 600
+
+Donnees : PhysioNet EEGMMIDB, sujet 1, runs 4/8/12 enchaines
+          (60000 echantillons, 375 s), rejoues en boucle.
+
+Resultat :
+  Duree mesuree            : 600.0 s
+  Echantillons recus       : 96001
+  Debit mesure             : 160.000 Hz (nominal 160 Hz)
+  Derive                   : +0.000 %  (seuil < 1.0 %)
+  Echantillons perdus      : 0
+  Horodatages desordonnes  : 0
+  Plus longue pause        : 82 ms
+  Marqueurs recus          : 148
+
+VERDICT : REUSSI
+
+Remarque : le lecteur a envoye 99200 echantillons au total ; il continue
+pendant la phase d'arret du recepteur, ce qui explique l'ecart avec les
+96001 recus pendant les 600 s de mesure.
+
+---------------------------------------------------------------------
+2. Test court de reference : 30 s a vitesse x1 (13/11/2026)
+---------------------------------------------------------------------
+  Echantillons recus : 4804 | Debit : 159.981 Hz | Derive : -0.012 %
+  Perdus : 0 | Desordonnes : 0 | Pause max : 78 ms
+VERDICT : REUSSI
+
+---------------------------------------------------------------------
+3. Tests des options du lecteur (hors perimetre T11)
+---------------------------------------------------------------------
+a) Vitesse x5 (sujet 1, run 4, sans boucle) :
+   20000 echantillons envoyes en environ 25 s (8001 a 10 s, 16001 a 20 s).
+   Debit = 800 echantillons/s = 5 x 160.                      -> VALIDE
+b) Vitesse x5 avec recepteur T11 :
+   Debit mesure 797.529 Hz, derive +398 %, 0 perdu, 0 desordonne.
+   L'ECHEC est attendu : T11 ne s'applique qu'a x1.
+   x5 sert uniquement au developpement.                       -> VALIDE
+c) Boucle : 32000 echantillons en 40 s a x5 (run de 20000 rejoue).
+                                                              -> VALIDE
+d) Mode synthetique (--synthetique --boucle --duree 30) :
+   3 runs de 120 s (57600 echantillons), 4800 envoyes en 30 s. -> VALIDE
+
+---------------------------------------------------------------------
+Conclusion
+---------------------------------------------------------------------
+Le lecteur diffuse le signal a 160 Hz sans derive mesurable (+0.000 %)
+et sans aucune perte sur 10 minutes. Le critere T11 est atteint avec une
+marge large. Le flux simule est stable.

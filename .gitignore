@@ -10,7 +10,7 @@ data/*
 
 # Godot
 .godot/
-*.import
+
 
 # Éditeur
 .vscode/
