@@ -40,7 +40,6 @@ var label_conf: Label
 var barre_conf: ProgressBar
 var en_attente := ""
 
-var client: Node
 var recus := 0
 var animations_ok := 0
 var erreurs := 0
@@ -69,10 +68,10 @@ func _ready() -> void:
 	label_etat.add_theme_color_override("font_color", Color.RED)
 	label_info.text = "En attente de messages..."
 	_creer_labels_s5()
-	client = $WebSocketClient
-	client.classe_recue.connect(_on_classe_recue)
-	client.etat_change.connect(_on_etat_change)
-	client.etat_flux.connect(_on_etat_flux)
+	# Les données arrivent via l'Autoload Bus (WebSocket ou source simulée)
+	Bus.prediction_recue.connect(_on_prediction_bus)
+	Bus.connexion_changee.connect(_on_etat_change)
+	Bus.etat_recu.connect(_on_etat_bus)
 	if MODE_DEMO:
 		_demo()
 
@@ -184,6 +183,15 @@ func jouer(nom: String) -> void:
 
 
 # ---------- WebSocket ----------
+func _on_prediction_bus(d: Dictionary) -> void:
+	_on_classe_recue(d["numero"], d["classe"], d["confiance"], d["vraie_classe"], d["t"])
+
+
+func _on_etat_bus(d: Dictionary) -> void:
+	if d.has("flux"):
+		_on_etat_flux(bool(d["flux"]))
+
+
 func _on_etat_change(connecte: bool) -> void:
 	label_etat.text = "Connecté" if connecte else "Déconnecté"
 	label_etat.add_theme_color_override("font_color", Color.GREEN if connecte else Color.RED)

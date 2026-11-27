@@ -23,7 +23,7 @@ REST = "repos"
 
 
 class DecisionMaker:
-    """Turn a stream of probability vectors into (classe, confiance)."""
+    """reçoit les probabilités produites par le modèle et renvoie(classe, confiance)."""
 
     def __init__(self, classes, threshold=config.ONLINE_THRESHOLD,
                  n_vote=config.ONLINE_N_VOTE, rest=REST):

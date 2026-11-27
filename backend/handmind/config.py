@@ -94,7 +94,7 @@ RANDOM_SEED = 42
 BASELINE_CLASSES = ["main_gauche", "main_droite"]  # left vs right hand
 N_BASELINE_SUBJECTS = 20   # first 20 TRAIN subjects of splits.json
 N_FOLDS = 5                # stratified k-fold, shuffled with RANDOM_SEED
-CSP_N_COMPONENTS = 6       # clipped to n_channels for config C (3 channels)
+CSP_N_COMPONENTS = 6       # clipped to n_channels for config C (3 channels)  #C'est une méthode de traitement du signal EEG qui cherche à trouver des combinaisons spatiales d'électrodes permettant de mieux distinguer deux classes.
 
 # ---------------------------------------------------------------------------
 # S4 - 3 / 5 classes, FBCSP, model choice
@@ -109,7 +109,7 @@ CLASS_SETS = {
 
 # FBCSP filter bank. The saved epochs are already band-passed 8-30 Hz, so the
 # bands stay inside 8-30 Hz (no need to rebuild data/processed/).
-FBCSP_BANDS = [(8, 12), (12, 16), (16, 20), (20, 24), (24, 30)]
+FBCSP_BANDS = [(8, 12), (12, 16), (16, 20), (20, 24), (24, 30)] #Au lieu d'utiliser une seule bande de fréquences, on divise le signal en plusieurs sous-bandes.Chaque sous-bande est traitée séparément avec CSP.Parce que les informations discriminantes entre deux mouvements peuvent se trouver dans différentes fréquences.
 FBCSP_N_COMPONENTS = 4   # CSP filters per band (clipped to n_channels)
 FBCSP_K_BEST = 10        # features kept by mutual information
 
@@ -118,7 +118,7 @@ FBCSP_K_BEST = 10        # features kept by mutual information
 # S4 choice: Riemann is the best model in every table (S3 2 classes, S4 3
 # classes, LOSO, BCI IV 2a). Config B (17 ch) instead of A (64 ch): ~5
 # points lower but 4x fewer channels, faster online, and the cahier's focus.
-CHOSEN_MODEL = "riemann"
+CHOSEN_MODEL = "riemann"#les méthodes riemanniennes exploitent la structure géométrique des matrices de covariance EEG pour effectuer la classification. Elles sont particulièrement adaptées aux signaux EEG, qui sont souvent bruités et non stationnaires. En utilisant des distances riemanniennes, ces méthodes peuvent capturer les variations subtiles dans les signaux EEG associées à différentes tâches ou états cognitifs.
 CHOSEN_CONFIG = "B"
 
 # BCI Competition IV 2a benchmark (test T8)
@@ -171,9 +171,9 @@ WS_STREAM_LOST_S = 1.5     # no EEG sample for 1.5 s -> "flux perdu"
 # ---------------------------------------------------------------------------
 # S6 - Integration, T12 / T15
 # ---------------------------------------------------------------------------
-T12_MEDIAN_MS = 200.0      # window received -> decision, median
-T12_P95_MS = 300.0         # 95th percentile
-T15_MAX_GAP = 0.05         # online vs offline accuracy: gap <= 5 points
+T12_MEDIAN_MS = 200.0      # le temps entre la réception d'une fenêtre EEG et la production de la décision soit évalué.
+T12_P95_MS = 300.0         # 95 % des décisions doivent être produites en 300 ms ou moins.
+T15_MAX_GAP = 0.05         # L'écart maximal toléré entre les performances offline et online.
 N_T15_SUBJECTS = 3         # S6: 3 demo subjects (S9: all 10)
 
 

@@ -23,7 +23,7 @@ S6 changes (integration with Etudiant B):
 """
 
 import time
-from bisect import bisect_right
+from bisect import bisect_right#Retrouver rapidement la classe réelle à partir des timestamps des marqueurs.
 
 import numpy as np
 
@@ -32,12 +32,13 @@ from .decision import REST, DecisionMaker
 from .filters import StreamFilter
 
 
-def bundle_class_names(bundle):
+def bundle_class_names(bundle):# bundle dictionnaire qui contient les éléments nécessaires pour utiliser le modèle entraîné
     """Class names in the column order of model.predict_proba."""
     return [config.CLASSES[int(c)] for c in bundle["model"].classes_]
 
 
-def marker_to_class(label):
+def marker_to_class(label):#transforme un marqueur EEG en nom de classe.
+    #marqueur est une information qui indique à quel mouvement correspond une partie du signal
     """Marker -> class name. Accepts our names, codes 0-4 or "T0/T1/T2"-free
     names already converted by the player. Unknown markers -> None."""
     if isinstance(label, (list, tuple)):
@@ -54,6 +55,7 @@ def marker_to_class(label):
 
 
 class OnlineClassifier:
+    #elle reçoit continuellement des données EEG, les traite et produit des prédictions sans attendre que l'enregistrement complet soit terminé.
     """Sliding-window classifier fed chunk by chunk.
 
     Parameters
@@ -106,7 +108,7 @@ class OnlineClassifier:
         self.decision_ts = []         # stream timestamp of each window's last sample
         self.numero = 0
 
-    def new_segment(self):
+    def new_segment(self):#On ne doit surtout pas mélanger les échantillons des deux runs.
         """The signal jumps (new run in the player): forget the past samples
         so that no window mixes two runs. Markers and counters are kept."""
         self.buffer[:] = 0.0
@@ -115,7 +117,8 @@ class OnlineClassifier:
         self.next_decision = self.n_seen + self.win
 
     # -- markers (true class) ------------------------------------------------
-    def push_marker(self, timestamp, label):
+    def push_marker(self, timestamp, label):#Elle traite trois types d'événement: 1. mémorise le timestamp du début du nouveau run.
+        #2. enregistre le moment où le replay est terminé 3. convertit le marqueur en classe et on stocke son timestamp.
         """Class markers -> true class. Technical markers of the player:
         "NOUVEAU_RUN:<n>" -> segment boundary, "FIN:<n>" -> end of replay."""
         if isinstance(label, (list, tuple)):
@@ -133,7 +136,7 @@ class OnlineClassifier:
             self.marker_labels.append(name)
 
     @property
-    def ended(self):
+    def ended(self):#Elle permet de savoir si le replay est réellement terminé.
         """True once "FIN" is received AND the EEG up to it has been processed.
         The marker stream is lighter than the EEG stream, so FIN can arrive
         while EEG samples sent before it are still waiting in the inlet."""
@@ -141,12 +144,12 @@ class OnlineClassifier:
             return False
         return self.last_ts >= self.end_ts - 0.01
 
-    def true_class(self, timestamp):
+    def true_class(self, timestamp):#Cette fonction retrouve la vraie classe à un instant donné.
         i = bisect_right(self.marker_times, timestamp)
         return self.marker_labels[i - 1] if i else None
 
     # -- EEG -----------------------------------------------------------------
-    def push(self, samples, timestamps):
+    def push(self, samples, timestamps):#Gérer les données et les frontières entre les runs
         """Feed one chunk, cutting it at the run boundaries if needed."""
         timestamps = np.asarray(timestamps, dtype=np.float64)
         if len(timestamps) and self.boundaries and timestamps[-1] >= self.boundaries[0]:
@@ -158,7 +161,7 @@ class OnlineClassifier:
             return before + self.push(samples[k:], timestamps[k:])
         return self._push(samples, timestamps)
 
-    def _push(self, samples, timestamps):
+    def _push(self, samples, timestamps):#Traiter les données EEG et déclencher les prédictions
         """Feed one chunk (no run boundary inside). samples: (n_samples, n_stream_channels) like LSL.
 
         Returns the list of messages (dicts) produced by this chunk: 0, 1 or
@@ -186,7 +189,7 @@ class OnlineClassifier:
         self.last_ts = timestamps[-1]
         return messages
 
-    def _append(self, x):
+    def _append(self, x):#Mettre à jour le buffer EEG
         n = x.shape[1]
         if n >= self.win:
             self.buffer = x[:, -self.win:].copy()
@@ -194,7 +197,7 @@ class OnlineClassifier:
             self.buffer = np.roll(self.buffer, -n, axis=1)
             self.buffer[:, -n:] = x
 
-    def _decide(self, ts, t_arrival=None):
+    def _decide(self, ts, t_arrival=None):#Effectuer la classification
         start = time.perf_counter()
         proba = self.model.predict_proba(self.buffer[None])[0]
         classe, confiance = self.decider.update(proba)

@@ -8,6 +8,8 @@
 [ext_resource type="Animation" uid="uid://c3a0b1hgyophq" path="res://assets/animations/main_gauche.res" id="4_q8u5g"]
 [ext_resource type="Animation" uid="uid://b2olf2c0mfbt6" path="res://assets/animations/repos.res" id="5_lhr70"]
 [ext_resource type="Script" uid="uid://qargfmlj71b4" path="res://scripts/WebSocketClient.gd" id="8_jlsqs"]
+[ext_resource type="Script" uid="uid://k8nxxrjth42u" path="res://scenes/source_simulee.gd" id="9_q8u5g"]
+[ext_resource type="Script" uid="uid://b0itj4dvpw5lr" path="res://scripts/ui/app.gd" id="10_lhr70"]
 
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_wp0k4"]
 _data = {
@@ -34,16 +36,11 @@ transform = Transform3D(1.2, 0, 0, 0, 1.2, 0, 0, 0, 1.2, 0, 0, 0)
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=2082632397]
 transform = Transform3D(0.8660254, -0.3213938, 0.38302222, 0, 0.76604444, 0.6427876, -0.5, -0.55667037, 0.66341394, 0, 0, 0)
 
-[node name="Room" type="Node3D" parent="." unique_id=18413881]
-
-[node name="Platform" type="Node3D" parent="." unique_id=1074106962]
-
-[node name="Decorations" type="Node3D" parent="." unique_id=1869150362]
-
 [node name="WebSocketClient" type="Node" parent="." unique_id=1351878845]
 script = ExtResource("8_jlsqs")
 
 [node name="UI" type="CanvasLayer" parent="." unique_id=471561047]
+visible = false
 
 [node name="LabelEtat" type="Label" parent="UI" unique_id=915431227]
 offset_right = 40.0
@@ -52,3 +49,15 @@ offset_bottom = 23.0
 [node name="LabelInfo" type="Label" parent="UI" unique_id=663490216]
 offset_right = 40.0
 offset_bottom = 23.0
+
+[node name="SourceSimulee" type="Node" parent="." unique_id=389355433]
+script = ExtResource("9_q8u5g")
+
+[node name="InterfaceV2" type="CanvasLayer" parent="." unique_id=80410818]
+
+[node name="App" type="Control" parent="InterfaceV2" unique_id=1527269814]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("10_lhr70")

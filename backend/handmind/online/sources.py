@@ -18,7 +18,7 @@ import numpy as np
 from .. import config
 
 
-class ReplaySource:
+class ReplaySource:#relire un enregistrement EEG qui existe déjà.
     """Replay an array (n_channels, n_times) + markers, optionally in real time.
 
     speed=1: real time, speed=5: 5x faster, speed=0: as fast as possible.
@@ -27,7 +27,7 @@ class ReplaySource:
     def __init__(self, data, sfreq, ch_names, markers=(), chunk_s=0.0625,
                  speed=1.0, loop=False):
         self.data = np.asarray(data)
-        self.sfreq = float(sfreq)
+        self.sfreq = float(sfreq)#chaque électrode produit 160 valeurs par seconde
         self.ch_names = list(ch_names)
         self.markers = sorted((float(t), m) for t, m in markers)
         self.chunk = max(1, int(round(chunk_s * self.sfreq)))
